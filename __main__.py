@@ -19,32 +19,37 @@ parser.add_argument('--token', '-t', default=os.environ.get('apikey'), help='Api
 config = parser.parse_args()
 
 # Initialize bot and dispatcher
-bot = Bot(token="5800929219:AAEJkd1w3358zH5fkfiyqD0a0rIHrLicKus")
+bot = Bot(token=config.token)
 dp = Dispatcher(bot)
 
 # Create temporary database
 database = defaultdict(lambda: { "s": "", "c": "" })
 
 # Handlers
-
 @dp.message_handler(commands=['start', 'help'])
-async def send_welcome(message: types.Message):
+async def send_welcome(message):
+    """Отправляет справку при команде start или help"""
     await message.reply("""Привет, я DSImageTgBot!
-Передай мне две картинки и я пенесу стиль с одной картинки (стиль-картинка) на другую (контент-картинка)
+Передай мне две картинки и я перенесу стиль с одной картинки (стиль-картинка) на другую (контент-картинка)
 Первая попавшая в бот картинка - стиль-картинка, остальные контент-картинка
-На каждую контент-картинка генеруется своя картинка со стиль-картинка
-Можно указать явно какая картинка стиль-картинка или поменять её прислав картинку с подписью "Style" или "Стиль" (не зависимо от регистра), приэтом вам будет отправленна послдняя контент-картинка с этим стилем
+На каждую контент-картинка генерируется своя картинка со стиль-картинка
+Можно указать явно какая картинка стиль-картинка или поменять её прислав картинку с подписью "Style" или "Стиль" (не зависимо от регистра), при этом вам будет отправлена последняя контент-картинка с этим стилем
 """)
 
 @dp.message_handler(content_types=["photo"])
-async def get_image(mes: types.Message):
+async def get_image(mes):
+    """Получает сообщение с фотографией и необязательным пояснением,
+    сохраняет ссылку на неё, каждый раз когда возможно отдает сгенерированную картинку"""
+    # Если фотографии со стилем нет, первая же фотография - это фото стиля
     if not database[mes.from_user.id]["s"]:
         database[mes.from_user.id]["s"] = mes.photo[-1].file_id
+    # Иначе обращаем внимание на подписи, а если из нет считаем контентом
     elif mes.text and (mes.text.lower() in ["style", "стиль"]):
         database[mes.from_user.id]["s"] = mes.photo[-1].file_id
     else:
         database[mes.from_user.id]["c"] = mes.photo[-1].file_id
     
+    # Каждый раз, когда есть пара картинок, генерируем третью и отправляем
     if database[mes.from_user.id]["s"] and database[mes.from_user.id]["c"]:
         c_file_info = await bot.get_file(database[mes.from_user.id]["c"])
         s_file_info = await bot.get_file(database[mes.from_user.id]["s"])
